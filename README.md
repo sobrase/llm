@@ -60,11 +60,13 @@
                     +-------------+-------------+
                                   |
                                   v
-                    +---------------------------+
-                    | vLLM (8x L40S)            |
-                    | Qwen3.5:122B + aliases    |
-                    | OpenAI compatible API     |
-                    +---------------------------+
+                   +--------------------------------------------+
+                   | vLLM pool                                  |
+                   | - vllm-fast (low latency)                  |
+                   | - vllm-balanced (default)                  |
+                   | - vllm-heavy (high quality / CI)           |
+                   | OpenAI compatible API behind LiteLLM       |
+                   +--------------------------------------------+
 ```
 
 ## 2) Principes de robustesse

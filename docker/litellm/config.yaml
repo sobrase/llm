@@ -17,29 +17,38 @@ litellm_settings:
   set_verbose: false
 
 model_list:
-  - model_name: qwen35-122b
+  - model_name: chat-fast
     litellm_params:
-      model: openai/qwen35-122b
-      api_base: http://vllm:8000/v1
+      model: openai/qwen-fast
+      api_base: http://vllm-fast:8000/v1
+      api_key: "offline-key"
+      rpm: 300
+      tpm: 240000
+
+  - model_name: chat-balanced
+    litellm_params:
+      model: openai/qwen-balanced
+      api_base: http://vllm-balanced:8000/v1
       api_key: "offline-key"
       rpm: 120
-      tpm: 360000
+      tpm: 320000
 
+  - model_name: chat-heavy
+    litellm_params:
+      model: openai/qwen35-122b
+      api_base: http://vllm-heavy:8000/v1
+      api_key: "offline-key"
+      rpm: 40
+      tpm: 240000
+
+  # Keep CI model stable for orchestrator default.
   - model_name: qwen35-122b-ci
     litellm_params:
       model: openai/qwen35-122b
-      api_base: http://vllm:8000/v1
+      api_base: http://vllm-heavy:8000/v1
       api_key: "offline-key"
       rpm: 20
       tpm: 60000
-
-  - model_name: qwen35-122b-interactive
-    litellm_params:
-      model: openai/qwen35-122b
-      api_base: http://vllm:8000/v1
-      api_key: "offline-key"
-      rpm: 100
-      tpm: 320000
 
   # Add new routed models by duplicating one block and updating:
   # - model_name
@@ -50,10 +59,13 @@ model_list:
 key_management_settings:
   - key: os.environ/LITELLM_API_KEY
     models:
-      - qwen35-122b
+      - chat-fast
+      - chat-balanced
+      - chat-heavy
       - qwen35-122b-ci
-      - qwen35-122b-interactive
     aliases:
+      fast: chat-fast
+      balanced: chat-balanced
+      heavy: chat-heavy
       ci: qwen35-122b-ci
-      interactive: qwen35-122b-interactive
-      default: qwen35-122b
+      default: chat-balanced
