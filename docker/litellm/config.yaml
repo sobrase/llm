@@ -1,0 +1,59 @@
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: null
+  disable_spend_logs: true
+
+router_settings:
+  routing_strategy: "simple-shuffle"
+  num_retries: 2
+  timeout: 120
+  redis_host: "redis"
+  redis_port: 6379
+  redis_password: null
+  cache_responses: false
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+
+model_list:
+  - model_name: qwen35-122b
+    litellm_params:
+      model: openai/qwen35-122b
+      api_base: http://vllm:8000/v1
+      api_key: "offline-key"
+      rpm: 120
+      tpm: 360000
+
+  - model_name: qwen35-122b-ci
+    litellm_params:
+      model: openai/qwen35-122b
+      api_base: http://vllm:8000/v1
+      api_key: "offline-key"
+      rpm: 20
+      tpm: 60000
+
+  - model_name: qwen35-122b-interactive
+    litellm_params:
+      model: openai/qwen35-122b
+      api_base: http://vllm:8000/v1
+      api_key: "offline-key"
+      rpm: 100
+      tpm: 320000
+
+  # Add new routed models by duplicating one block and updating:
+  # - model_name
+  # - litellm_params.model
+  # - api_base (new vLLM endpoint if needed)
+  # - rpm/tpm according to your SLO
+
+key_management_settings:
+  - key: os.environ/LITELLM_API_KEY
+    models:
+      - qwen35-122b
+      - qwen35-122b-ci
+      - qwen35-122b-interactive
+    aliases:
+      ci: qwen35-122b-ci
+      interactive: qwen35-122b-interactive
+      default: qwen35-122b

@@ -1,0 +1,129 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: ci-redis
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [ci_net]
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm-gateway
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    volumes:
+      - ./docker/litellm/config.yaml:/app/config.yaml:ro
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+    restart: unless-stopped
+    depends_on:
+      - vllm
+    networks: [ci_net]
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-main
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - VLLM_MODEL=${VLLM_MODEL}
+      - VLLM_SERVED_MODEL_NAME=${VLLM_SERVED_MODEL_NAME:-qwen35-122b}
+      - VLLM_MAX_MODEL_LEN=${VLLM_MAX_MODEL_LEN:-32768}
+      - VLLM_GPU_MEMORY_UTILIZATION=${VLLM_GPU_MEMORY_UTILIZATION:-0.92}
+      - VLLM_TENSOR_PARALLEL_SIZE=${VLLM_TENSOR_PARALLEL_SIZE:-8}
+      - VLLM_DTYPE=${VLLM_DTYPE:-bfloat16}
+      - VLLM_EXTRA_ARGS=${VLLM_EXTRA_ARGS:-}
+    volumes:
+      - ./docker/vllm/start-vllm.sh:/start-vllm.sh:ro
+      - ${VLLM_HOST_MODELS_DIR:-./models}:/models
+    entrypoint: ["/bin/bash", "/start-vllm.sh"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/v1/models >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+    networks: [ci_net]
+
+  orchestrator-api:
+    build:
+      context: ./orchestrator
+      dockerfile: Dockerfile
+    container_name: ci-orchestrator-api
+    command: ["python", "-m", "app.main", "webhook"]
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - GITEA_WEBHOOK_SECRET=${GITEA_WEBHOOK_SECRET}
+      - MAX_FIX_LOOPS=${MAX_FIX_LOOPS:-5}
+      - TEST_IMAGE=${TEST_IMAGE:-offline-ci-python:3.11}
+      - TEST_COMMAND=${TEST_COMMAND:-pytest -q}
+      - GITEA_BASE_URL=${GITEA_BASE_URL}
+      - GITEA_TOKEN=${GITEA_TOKEN}
+      - BOT_GIT_NAME=${BOT_GIT_NAME:-ci-agent-bot}
+      - BOT_GIT_EMAIL=${BOT_GIT_EMAIL:-ci-agent@local.lan}
+      - OPENCODE_SCRIPT=/workspace/scripts/opencode_ci_agent.sh
+      - OPENCODE_MODEL=${OPENCODE_MODEL:-qwen35-122b-ci}
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+    volumes:
+      - ./scripts:/workspace/scripts:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      litellm:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks: [ci_net]
+
+  orchestrator-worker:
+    build:
+      context: ./orchestrator
+      dockerfile: Dockerfile
+    container_name: ci-orchestrator-worker
+    command: ["python", "-m", "app.main", "worker"]
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - GITEA_WEBHOOK_SECRET=${GITEA_WEBHOOK_SECRET}
+      - MAX_FIX_LOOPS=${MAX_FIX_LOOPS:-5}
+      - TEST_IMAGE=${TEST_IMAGE:-offline-ci-python:3.11}
+      - TEST_COMMAND=${TEST_COMMAND:-pytest -q}
+      - GITEA_BASE_URL=${GITEA_BASE_URL}
+      - GITEA_TOKEN=${GITEA_TOKEN}
+      - BOT_GIT_NAME=${BOT_GIT_NAME:-ci-agent-bot}
+      - BOT_GIT_EMAIL=${BOT_GIT_EMAIL:-ci-agent@local.lan}
+      - OPENCODE_SCRIPT=/workspace/scripts/opencode_ci_agent.sh
+      - OPENCODE_MODEL=${OPENCODE_MODEL:-qwen35-122b-ci}
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - SANDBOX_NETWORK=${SANDBOX_NETWORK:-none}
+      - SANDBOX_CPU_LIMIT=${SANDBOX_CPU_LIMIT:-2}
+      - SANDBOX_MEMORY_LIMIT=${SANDBOX_MEMORY_LIMIT:-4g}
+    volumes:
+      - ./scripts:/workspace/scripts:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ci_workdir:/tmp/ci-workdir
+    depends_on:
+      redis:
+        condition: service_healthy
+      litellm:
+        condition: service_started
+    restart: unless-stopped
+    networks: [ci_net]
+
+networks:
+  ci_net:
+    driver: bridge
+
+volumes:
+  redis_data:
+  ci_workdir:
