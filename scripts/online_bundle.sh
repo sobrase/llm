@@ -33,8 +33,8 @@ python -m pip download -r orchestrator/requirements.txt -d "${BUNDLE_DIR}/wheels
 
 echo "[5/5] Model sync (example for local mirror path)..."
 echo "Copy your Qwen model files into: ${BUNDLE_DIR}/models/Qwen2.5-Coder-32B-Instruct"
-echo "Example with Python huggingface_hub on online machine:"
-echo "  python -c 'from huggingface_hub import snapshot_download; snapshot_download(repo_id=\"Qwen/Qwen2.5-Coder-32B-Instruct\", local_dir=\"${BUNDLE_DIR}/models/Qwen2.5-Coder-32B-Instruct\", local_dir_use_symlinks=False)'"
+echo "Example with git-lfs on online machine:"
+echo "  GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct ${BUNDLE_DIR}/models/Qwen2.5-Coder-32B-Instruct && git -C ${BUNDLE_DIR}/models/Qwen2.5-Coder-32B-Instruct lfs pull"
 
 tar czf "${BUNDLE_DIR}.tar.gz" "${BUNDLE_DIR}"
 echo "Bundle generated: ${BUNDLE_DIR}.tar.gz"
