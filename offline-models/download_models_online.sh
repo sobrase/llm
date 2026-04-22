@@ -10,8 +10,8 @@ DEST_DIR="${1:-${SCRIPT_DIR}/../offline-bundle/models}"
 MANIFEST="${2:-${SCRIPT_DIR}/models.manifest}"
 ALLOW_LOWBIT_QUANTS="${ALLOW_LOWBIT_QUANTS:-0}"
 
-if ! command -v hf >/dev/null 2>&1; then
-  echo "ERROR: hf CLI is required. Install with: pip install -U huggingface_hub"
+if ! command -v python >/dev/null 2>&1; then
+  echo "ERROR: python is required."
   exit 1
 fi
 
@@ -20,8 +20,8 @@ if [[ ! -f "${MANIFEST}" ]]; then
   exit 1
 fi
 
-if ! hf auth whoami >/dev/null 2>&1; then
-  echo "ERROR: Hugging Face auth missing. Run: hf auth login"
+if ! python -c "import huggingface_hub" >/dev/null 2>&1; then
+  echo "ERROR: huggingface_hub is required. Install with: pip install -U huggingface_hub"
   exit 1
 fi
 
@@ -46,7 +46,23 @@ while IFS= read -r repo; do
   mkdir -p "${out_dir}"
 
   echo "-> ${repo}"
-  hf download "${repo}" --local-dir "${out_dir}"
+  # Use Python API directly to avoid relying on hf/huggingface-cli binaries.
+  python - "${repo}" "${out_dir}" <<'PY'
+import os
+import sys
+from huggingface_hub import snapshot_download
+
+repo_id = sys.argv[1]
+local_dir = sys.argv[2]
+token = os.environ.get("HF_TOKEN")
+
+snapshot_download(
+    repo_id=repo_id,
+    local_dir=local_dir,
+    local_dir_use_symlinks=False,
+    token=token,
+)
+PY
 done < "${MANIFEST}"
 
 echo "Done. Models downloaded to: ${DEST_DIR}"
