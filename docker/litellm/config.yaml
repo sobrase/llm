@@ -1,6 +1,6 @@
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
-  database_url: null
+  database_url: os.environ/LITELLM_DATABASE_URL
   disable_spend_logs: true
 
 router_settings:
@@ -25,30 +25,30 @@ model_list:
       rpm: 300
       tpm: 240000
 
-  - model_name: chat-balanced
-    litellm_params:
-      model: openai/qwen-balanced
-      api_base: http://vllm-balanced:8000/v1
-      api_key: "offline-key"
-      rpm: 120
-      tpm: 320000
+  # - model_name: chat-balanced
+  #   litellm_params:
+  #     model: openai/qwen-balanced
+  #     api_base: http://vllm-balanced:8000/v1
+  #     api_key: "offline-key"
+  #     rpm: 120
+  #     tpm: 320000
 
-  - model_name: chat-heavy
-    litellm_params:
-      model: openai/qwen35-122b
-      api_base: http://vllm-heavy:8000/v1
-      api_key: "offline-key"
-      rpm: 40
-      tpm: 240000
+  # - model_name: chat-heavy
+  #   litellm_params:
+  #     model: openai/qwen-heavy
+  #     api_base: http://vllm-heavy:8000/v1
+  #     api_key: "offline-key"
+  #     rpm: 40
+  #     tpm: 240000
 
   # Keep CI model stable for orchestrator default.
-  - model_name: qwen35-122b-ci
-    litellm_params:
-      model: openai/qwen35-122b
-      api_base: http://vllm-heavy:8000/v1
-      api_key: "offline-key"
-      rpm: 20
-      tpm: 60000
+  # - model_name: qwen-ci
+  #   litellm_params:
+  #     model: openai/qwen-ci
+  #     api_base: http://vllm-ci:8000/v1
+  #     api_key: "offline-key"
+  #     rpm: 20
+  #     tpm: 60000
 
   # Add new routed models by duplicating one block and updating:
   # - model_name
@@ -60,12 +60,12 @@ key_management_settings:
   - key: os.environ/LITELLM_API_KEY
     models:
       - chat-fast
-      - chat-balanced
-      - chat-heavy
-      - qwen35-122b-ci
+      # - chat-balanced
+      # - chat-heavy
+      # - qwen-ci
     aliases:
       fast: chat-fast
-      balanced: chat-balanced
-      heavy: chat-heavy
-      ci: qwen35-122b-ci
-      default: chat-balanced
+      # balanced: chat-balanced
+      # heavy: chat-heavy
+      # ci: qwen-ci
+      default: chat-fast

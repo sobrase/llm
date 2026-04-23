@@ -9,7 +9,7 @@ GPU_MEM="${VLLM_GPU_MEMORY_UTILIZATION:-0.92}"
 DTYPE="${VLLM_DTYPE:-bfloat16}"
 EXTRA_ARGS="${VLLM_EXTRA_ARGS:-}"
 
-exec python -m vllm.entrypoints.openai.api_server \
+exec python3 -m vllm.entrypoints.openai.api_server \
   --host 0.0.0.0 \
   --port 8000 \
   --model "${MODEL_PATH}" \
@@ -18,5 +18,5 @@ exec python -m vllm.entrypoints.openai.api_server \
   --dtype "${DTYPE}" \
   --gpu-memory-utilization "${GPU_MEM}" \
   --max-model-len "${MAX_LEN}" \
-  --disable-log-requests \
+  --no-enable-log-requests \
   ${EXTRA_ARGS}

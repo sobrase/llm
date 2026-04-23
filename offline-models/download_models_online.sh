@@ -15,7 +15,7 @@ if ! command -v git >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v git-lfs >/dev/null 2>&1 && ! git lfs version >/dev/null 2>&1; then
+if ! git lfs version >/dev/null 2>&1; then
   echo "ERROR: git-lfs is required."
   exit 1
 fi
@@ -52,9 +52,11 @@ while IFS= read -r repo; do
     # Use bearer auth without relying on Hugging Face CLI/libs.
     GIT_LFS_SKIP_SMUDGE=1 git -c "http.extraHeader=Authorization: Bearer ${HF_TOKEN}" \
       clone "${repo_url}" "${out_dir}"
+    git -C "${out_dir}" lfs install --local
     git -C "${out_dir}" -c "http.extraHeader=Authorization: Bearer ${HF_TOKEN}" lfs pull
   else
     GIT_LFS_SKIP_SMUDGE=1 git clone "${repo_url}" "${out_dir}"
+    git -C "${out_dir}" lfs install --local
     git -C "${out_dir}" lfs pull
   fi
 done < "${MANIFEST}"

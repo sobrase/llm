@@ -62,7 +62,32 @@ if [[ ! -f "${HOST_MODEL_PATH}/config.json" ]]; then
   exit 1
 fi
 
+shopt -s nullglob
+weight_candidates=(
+  "${HOST_MODEL_PATH}"/*.safetensors
+  "${HOST_MODEL_PATH}"/*.bin
+  "${HOST_MODEL_PATH}"/model-*.safetensors
+  "${HOST_MODEL_PATH}"/model-*.bin
+)
+shopt -u nullglob
+
+if [[ "${#weight_candidates[@]}" -eq 0 ]]; then
+  echo "ERROR: no model weight file found (*.safetensors/*.bin) in: ${HOST_MODEL_PATH}"
+  exit 1
+fi
+
+for weight_file in "${weight_candidates[@]}"; do
+  if [[ ! -f "${weight_file}" ]]; then
+    continue
+  fi
+  if rg -q "^version https://git-lfs.github.com/spec/v1$" "${weight_file}"; then
+    echo "ERROR: model file is still a Git LFS pointer (not downloaded): ${weight_file}"
+    exit 1
+  fi
+done
+
 echo "OK: offline vLLM wiring looks valid."
 echo " - VLLM_HOST_MODELS_DIR=${VLLM_HOST_MODELS_DIR}"
 echo " - VLLM_MODEL=${VLLM_MODEL}"
 echo " - Resolved host path=${HOST_MODEL_PATH}"
+echo " - Weight files found=${#weight_candidates[@]}"

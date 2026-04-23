@@ -22,6 +22,7 @@ This folder provides a repeatable workflow to prepare and deploy multiple vLLM-c
 - `download_models_online.sh`: pull model snapshots on an internet-connected machine
 - `build_offline_models_bundle.sh`: package snapshots into a transfer archive
 - `install_models_offline.sh`: install model snapshots on the target offline host
+- `verify_offline_vllm_setup.sh`: validate `.env` wiring and assert real (non-LFS) weights exist
 
 ## 1) Download snapshots online
 

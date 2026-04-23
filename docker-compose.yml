@@ -14,19 +14,42 @@ services:
       retries: 5
     networks: [ci_net]
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: ci-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-litellm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-litellm}
+      POSTGRES_DB: ${POSTGRES_DB:-litellm}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [ci_net]
+
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm-gateway
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     volumes:
       - ./docker/litellm/config.yaml:/app/config.yaml:ro
+    ports:
+      - "4000:4000"
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - LITELLM_DATABASE_URL=${LITELLM_DATABASE_URL}
     restart: unless-stopped
     depends_on:
-      - vllm-fast
-      - vllm-balanced
-      - vllm-heavy
+      postgres:
+        condition: service_healthy
+      vllm-fast:
+        condition: service_started
+      # - vllm-balanced
+      # - vllm-heavy
     networks: [ci_net]
 
   vllm-fast:
@@ -55,62 +78,63 @@ services:
       retries: 10
     networks: [ci_net]
 
-  vllm-balanced:
-    image: vllm/vllm-openai:latest
-    container_name: vllm-balanced
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=${VLLM_BALANCED_VISIBLE_DEVICES:-1,2,3}
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      - VLLM_MODEL=${VLLM_BALANCED_MODEL}
-      - VLLM_SERVED_MODEL_NAME=${VLLM_BALANCED_SERVED_MODEL_NAME:-qwen-balanced}
-      - VLLM_MAX_MODEL_LEN=${VLLM_BALANCED_MAX_MODEL_LEN:-32768}
-      - VLLM_GPU_MEMORY_UTILIZATION=${VLLM_BALANCED_GPU_MEMORY_UTILIZATION:-0.92}
-      - VLLM_TENSOR_PARALLEL_SIZE=${VLLM_BALANCED_TENSOR_PARALLEL_SIZE:-3}
-      - VLLM_DTYPE=${VLLM_BALANCED_DTYPE:-bfloat16}
-      - VLLM_EXTRA_ARGS=${VLLM_BALANCED_EXTRA_ARGS:-}
-    volumes:
-      - ./docker/vllm/start-vllm.sh:/start-vllm.sh:ro
-      - ${VLLM_HOST_MODELS_DIR:-./models}:/models
-    entrypoint: ["/bin/bash", "/start-vllm.sh"]
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/v1/models >/dev/null"]
-      interval: 30s
-      timeout: 5s
-      retries: 10
-    networks: [ci_net]
+  # vllm-balanced:
+  #   image: vllm/vllm-openai:latest
+  #   container_name: vllm-balanced
+  #   runtime: nvidia
+  #   environment:
+  #     - NVIDIA_VISIBLE_DEVICES=${VLLM_BALANCED_VISIBLE_DEVICES:-1,2,3}
+  #     - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+  #     - VLLM_MODEL=${VLLM_BALANCED_MODEL}
+  #     - VLLM_SERVED_MODEL_NAME=${VLLM_BALANCED_SERVED_MODEL_NAME:-qwen-balanced}
+  #     - VLLM_MAX_MODEL_LEN=${VLLM_BALANCED_MAX_MODEL_LEN:-32768}
+  #     - VLLM_GPU_MEMORY_UTILIZATION=${VLLM_BALANCED_GPU_MEMORY_UTILIZATION:-0.92}
+  #     - VLLM_TENSOR_PARALLEL_SIZE=${VLLM_BALANCED_TENSOR_PARALLEL_SIZE:-3}
+  #     - VLLM_DTYPE=${VLLM_BALANCED_DTYPE:-bfloat16}
+  #     - VLLM_EXTRA_ARGS=${VLLM_BALANCED_EXTRA_ARGS:-}
+  #   volumes:
+  #     - ./docker/vllm/start-vllm.sh:/start-vllm.sh:ro
+  #     - ${VLLM_HOST_MODELS_DIR:-./models}:/models
+  #   entrypoint: ["/bin/bash", "/start-vllm.sh"]
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -sf http://localhost:8000/v1/models >/dev/null"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 10
+  #   networks: [ci_net]
 
-  vllm-heavy:
-    image: vllm/vllm-openai:latest
-    container_name: vllm-heavy
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=${VLLM_HEAVY_VISIBLE_DEVICES:-4,5,6,7}
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      - VLLM_MODEL=${VLLM_HEAVY_MODEL}
-      - VLLM_SERVED_MODEL_NAME=${VLLM_HEAVY_SERVED_MODEL_NAME:-qwen35-122b}
-      - VLLM_MAX_MODEL_LEN=${VLLM_HEAVY_MAX_MODEL_LEN:-32768}
-      - VLLM_GPU_MEMORY_UTILIZATION=${VLLM_HEAVY_GPU_MEMORY_UTILIZATION:-0.92}
-      - VLLM_TENSOR_PARALLEL_SIZE=${VLLM_HEAVY_TENSOR_PARALLEL_SIZE:-4}
-      - VLLM_DTYPE=${VLLM_HEAVY_DTYPE:-bfloat16}
-      - VLLM_EXTRA_ARGS=${VLLM_HEAVY_EXTRA_ARGS:-}
-    volumes:
-      - ./docker/vllm/start-vllm.sh:/start-vllm.sh:ro
-      - ${VLLM_HOST_MODELS_DIR:-./models}:/models
-    entrypoint: ["/bin/bash", "/start-vllm.sh"]
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/v1/models >/dev/null"]
-      interval: 30s
-      timeout: 5s
-      retries: 10
-    networks: [ci_net]
+  # vllm-heavy:
+  #   image: vllm/vllm-openai:latest
+  #   container_name: vllm-heavy
+  #   runtime: nvidia
+  #   environment:
+  #     - NVIDIA_VISIBLE_DEVICES=${VLLM_HEAVY_VISIBLE_DEVICES:-4,5,6,7}
+  #     - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+  #     - VLLM_MODEL=${VLLM_HEAVY_MODEL}
+  #     - VLLM_SERVED_MODEL_NAME=${VLLM_HEAVY_SERVED_MODEL_NAME:-qwen35-122b}
+  #     - VLLM_MAX_MODEL_LEN=${VLLM_HEAVY_MAX_MODEL_LEN:-32768}
+  #     - VLLM_GPU_MEMORY_UTILIZATION=${VLLM_HEAVY_GPU_MEMORY_UTILIZATION:-0.92}
+  #     - VLLM_TENSOR_PARALLEL_SIZE=${VLLM_HEAVY_TENSOR_PARALLEL_SIZE:-4}
+  #     - VLLM_DTYPE=${VLLM_HEAVY_DTYPE:-bfloat16}
+  #     - VLLM_EXTRA_ARGS=${VLLM_HEAVY_EXTRA_ARGS:-}
+  #   volumes:
+  #     - ./docker/vllm/start-vllm.sh:/start-vllm.sh:ro
+  #     - ${VLLM_HOST_MODELS_DIR:-./models}:/models
+  #   entrypoint: ["/bin/bash", "/start-vllm.sh"]
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -sf http://localhost:8000/v1/models >/dev/null"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 10
+  #   networks: [ci_net]
 
   orchestrator-api:
-    build:
-      context: ./orchestrator
-      dockerfile: Dockerfile
+    # Image pré-construite (évite un rebuild à chaque `compose up`). Rebuild manuel si le code change :
+    #   docker build -t offline-ci-orchestrator:latest ./orchestrator
+    image: ${ORCHESTRATOR_IMAGE:-offline-ci-orchestrator:latest}
+    pull_policy: never
     container_name: ci-orchestrator-api
     command: ["python", "-m", "app.main", "webhook"]
     environment:
@@ -124,7 +148,9 @@ services:
       - BOT_GIT_NAME=${BOT_GIT_NAME:-ci-agent-bot}
       - BOT_GIT_EMAIL=${BOT_GIT_EMAIL:-ci-agent@local.lan}
       - OPENCODE_SCRIPT=/workspace/scripts/opencode_ci_agent.sh
-      - OPENCODE_MODEL=${OPENCODE_MODEL:-qwen35-122b-ci}
+      - OPENCODE_MODEL=${OPENCODE_MODEL:-chat-fast}
+      - OPENCODE_MODEL_CONTEXT=${OPENCODE_MODEL_CONTEXT:-8192}
+      - OPENCODE_MODEL_MAX_OUTPUT=${OPENCODE_MODEL_MAX_OUTPUT:-2048}
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
     volumes:
@@ -140,9 +166,8 @@ services:
     networks: [ci_net]
 
   orchestrator-worker:
-    build:
-      context: ./orchestrator
-      dockerfile: Dockerfile
+    image: ${ORCHESTRATOR_IMAGE:-offline-ci-orchestrator:latest}
+    pull_policy: never
     container_name: ci-orchestrator-worker
     command: ["python", "-m", "app.main", "worker"]
     environment:
@@ -156,7 +181,9 @@ services:
       - BOT_GIT_NAME=${BOT_GIT_NAME:-ci-agent-bot}
       - BOT_GIT_EMAIL=${BOT_GIT_EMAIL:-ci-agent@local.lan}
       - OPENCODE_SCRIPT=/workspace/scripts/opencode_ci_agent.sh
-      - OPENCODE_MODEL=${OPENCODE_MODEL:-qwen35-122b-ci}
+      - OPENCODE_MODEL=${OPENCODE_MODEL:-chat-fast}
+      - OPENCODE_MODEL_CONTEXT=${OPENCODE_MODEL_CONTEXT:-8192}
+      - OPENCODE_MODEL_MAX_OUTPUT=${OPENCODE_MODEL_MAX_OUTPUT:-2048}
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
       - SANDBOX_NETWORK=${SANDBOX_NETWORK:-none}
@@ -181,3 +208,4 @@ networks:
 volumes:
   redis_data:
   ci_workdir:
+  postgres_data:

@@ -15,16 +15,24 @@ if [[ -z "${BUNDLE_ROOT}" ]]; then
   exit 1
 fi
 
-echo "[1/4] Load docker images..."
+echo "[1/5] Load docker images..."
 for img in "${BUNDLE_ROOT}"/images/*.tar; do
   docker load -i "${img}"
 done
 
-echo "[2/4] Sync model files..."
+echo "[2/5] Sync model files..."
 mkdir -p "${TARGET_DIR}/models"
 cp -r "${BUNDLE_ROOT}/models/"* "${TARGET_DIR}/models/" || true
 
-echo "[3/4] Prepare env file..."
+echo "[3/5] Copy OpenCode air-gap artifacts (schema + npm tarball)..."
+if [[ -d "${BUNDLE_ROOT}/opencode" ]]; then
+  cp -a "${BUNDLE_ROOT}/opencode" "${TARGET_DIR}/opencode-airgap"
+  echo "  -> ${TARGET_DIR}/opencode-airgap (see README-airgap.txt inside)"
+else
+  echo "  (no opencode/ in bundle; regenerate bundle with scripts/online_bundle.sh on an online host)"
+fi
+
+echo "[4/5] Prepare env file..."
 if [[ ! -f "${TARGET_DIR}/.env" ]]; then
   cp .env.example "${TARGET_DIR}/.env"
   sed -i "s|^VLLM_HOST_MODELS_DIR=.*|VLLM_HOST_MODELS_DIR=${TARGET_DIR}/models|" "${TARGET_DIR}/.env"
@@ -39,9 +47,12 @@ if [[ ! -f "${TARGET_DIR}/.env" ]]; then
   echo "Edit ${TARGET_DIR}/.env with your secrets and Gitea endpoints."
 fi
 
-echo "[4/4] Deploy stack..."
+echo "[5/5] Deploy stack..."
 cp docker-compose.yml "${TARGET_DIR}/docker-compose.yml"
 cp -r docker orchestrator scripts docs "${TARGET_DIR}/"
+if [[ -d .opencode ]]; then
+  cp -a .opencode "${TARGET_DIR}/"
+fi
 cd "${TARGET_DIR}"
 chmod +x scripts/*.sh docker/vllm/start-vllm.sh
 docker compose --env-file .env up -d
